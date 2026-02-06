@@ -22,8 +22,6 @@ pub fn search_ast_tree(root: &SyntaxNode) -> Result<Vec<(PathBuf, String)>, Repo
                 .cast()
                 .ok_or(report!("SyntaxKind didn't match true type"))?;
 
-            log::debug!("Found raw with type: {:?}", casted.lang());
-
             let parse_result = parse_raw(&casted);
             if let Some(parse_result) = parse_result {
                 results.push(parse_result);
@@ -76,9 +74,7 @@ pub fn search_ast_tree(root: &SyntaxNode) -> Result<Vec<(PathBuf, String)>, Repo
             let mut sub_results = search_ast_tree(casted.body().to_untyped())?;
             results.append(&mut sub_results);
         }
-        _ => {
-            log::debug!("Recursion ends at {:?}", root);
-        }
+        _ => {}
     }
 
     Ok(results)

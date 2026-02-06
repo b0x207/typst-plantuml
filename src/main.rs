@@ -3,10 +3,11 @@ use log::info;
 use notify::event::{DataChange, ModifyKind};
 use notify::{EventKind, Watcher};
 use rootcause::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
 mod parser;
+mod render;
 
 #[cfg(not(debug_assertions))]
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
@@ -18,11 +19,14 @@ const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
 #[command(version, about, long_about = None)]
 struct Cli {
     target: PathBuf,
+
+    #[arg(long)]
+    asset_dir: Option<PathBuf>,
 }
 
-fn process_file(path: PathBuf) -> Result<(), Report> {
+fn process_file(path: PathBuf, asset_dir: &Path) -> Result<(), Report> {
     // This is a very dumb heuristic that should be improved upon later. For the sake of speed,
-    // however, we will just check the file extension to ensure that the file is actually typst
+    // however, we will just check the file extension to ensure that the file is actually Typst
     let extension = path
         .extension()
         .unwrap_or_default()
@@ -40,19 +44,27 @@ fn process_file(path: PathBuf) -> Result<(), Report> {
     let raw_blocks = parser::search_ast_tree(&tree)?;
     info!("Found {} items to process", raw_blocks.len());
     for block in raw_blocks {
-        info!("-> {:?}", block.0);
+        let output_path = asset_dir.join(block.0);
+        let target_format = match output_path.extension() {
+            Some(ext) => ext
+                .to_str()
+                .ok_or(report!("Output path didn't have a valid extension"))?,
+            None => ".svg",
+        };
+
+        render::render_plantuml(&output_path, target_format, &block.1)?;
     }
 
     Ok(())
 }
 
-fn event_handler(event: notify::Event) -> Result<(), Report> {
+fn event_handler(event: notify::Event, asset_dir: &Path) -> Result<(), Report> {
     if event.kind != EventKind::Modify(ModifyKind::Data(DataChange::Any)) {
         return Ok(());
     }
 
     for path in event.paths {
-        process_file(path)?;
+        process_file(path, asset_dir)?;
     }
 
     Ok(())
@@ -64,6 +76,11 @@ fn main() -> Result<(), Report> {
         .init();
 
     let cli = Cli::parse();
+    let asset_dir = cli.asset_dir.unwrap_or(PathBuf::from("."));
+
+    if !asset_dir.exists() {
+        std::fs::create_dir(&asset_dir)?;
+    }
 
     let (tx, rx) = mpsc::channel::<Result<notify::Event, notify::Error>>();
     let mut watcher = notify::recommended_watcher(tx)?;
@@ -72,7 +89,7 @@ fn main() -> Result<(), Report> {
     info!("Watching directory {:?}", cli.target);
 
     for res in rx {
-        event_handler(res?)?;
+        event_handler(res?, &asset_dir)?;
     }
 
     Ok(())
