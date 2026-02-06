@@ -3,7 +3,7 @@ use rootcause::prelude::*;
 use std::path::PathBuf;
 use typst_syntax::{
     SyntaxKind, SyntaxNode,
-    ast::{Arg, AstNode, ContentBlock, EnumItem, FuncCall, Markup, Raw},
+    ast::{Arg, AstNode, Conditional, ContentBlock, EnumItem, FuncCall, Markup, Raw},
 };
 
 // All the code in here is absolutely horrible. Many terrible things have been done where in the
@@ -73,6 +73,22 @@ pub fn search_ast_tree(root: &SyntaxNode) -> Result<Vec<(PathBuf, String)>, Repo
 
             let mut sub_results = search_ast_tree(casted.body().to_untyped())?;
             results.append(&mut sub_results);
+        }
+        SyntaxKind::Conditional => {
+            let casted: Conditional = root
+                .cast()
+                .ok_or(report!("SyntaxKind didn't match true type"))?;
+
+            let mut sub_results = search_ast_tree(casted.condition().to_untyped())?;
+            let mut sub2_results = search_ast_tree(casted.if_body().to_untyped())?;
+            let mut sub3_results = match casted.else_body() {
+                Some(else_body) => search_ast_tree(else_body.to_untyped())?,
+                None => vec![],
+            };
+
+            results.append(&mut sub_results);
+            results.append(&mut sub2_results);
+            results.append(&mut sub3_results);
         }
         _ => {}
     }

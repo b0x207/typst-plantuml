@@ -4,7 +4,7 @@ A simple tool that detects changes to Typst code and uses inline PlantUML to gen
 
 ## Warnings
 
-This is incredibly unstable and rush software.
+This is incredibly unstable and rushed software.
 It only exists to aid some very specific use cases which has resulted in a severe lack of flexibility.
 In other words, the interface and code has been thrown together with a lot of undocumented assumptions about the systems it will run on and patterns of usage.
 
@@ -21,3 +21,20 @@ cargo install --path . --locked
 Then just run with `typst-plantuml <some directory>`.
 
 Nix support will come very soon.
+
+### Typst Code
+
+Inside of a typst document, you can then do something like:
+````typst
+#if false [
+```plantuml
+' test.svg
+@startuml
+Hello -> World: Wow
+@enduml
+```
+]
+#image("test.svg")
+````
+
+Note that the conditional is used to hide the code block without removing it fromt the AST (like a comment would).
