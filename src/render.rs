@@ -16,6 +16,7 @@ pub fn render_plantuml(
         .arg("--pipe")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()?;
 
     let stdin = render_proc
@@ -27,10 +28,7 @@ pub fn render_plantuml(
     let rendered = render_proc.wait_with_output()?;
 
     if !rendered.status.success() {
-        let report = report!("Rendering failed!")
-            .attach(String::from_utf8(rendered.stdout)?)
-            .attach(String::from_utf8(rendered.stderr)?);
-        bail!(report);
+        log::warn!("Rendering producted an error!");
     }
 
     std::fs::write(out_file, rendered.stdout)?;
